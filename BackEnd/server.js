@@ -15,14 +15,14 @@ app.use(cors({
 
 app.use(express.json());
 
-// Validation Schema update (experience ko nullable banayein)
+// Validation Schema 
 const candidateSchema = z.object({
   name: z.string().min(2),
   age: z.number().min(18),
   email: z.string().email(),
   phone: z.string().optional().or(z.literal('')), // Empty string handle karne ke liye
   skills: z.string().optional(),
-  experience: z.number().nullable().default(0), // Null allow karein
+  experience: z.number().nullable().default(0), // Null allow 
   appliedPosition: z.string(),
   status: z.string().default('Applied'),
 });
