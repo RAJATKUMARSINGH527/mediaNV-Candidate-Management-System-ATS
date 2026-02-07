@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:7000";
 
 export default function CandidateDashboard() {
   const [candidates, setCandidates] = useState([]);
@@ -31,23 +31,29 @@ export default function CandidateDashboard() {
 
   useEffect(() => { fetchCandidates(); }, [fetchCandidates]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const payload = { 
-        ...formData, 
-        age: parseInt(formData.age), 
-        experience: parseInt(formData.experience) 
-      };
-      await axios.post(`${API_URL}/api/candidates`, payload);
-      setShowModal(false);
-      setFormData({ name: "", age: "", email: "", phone: "", skills: "", experience: "", appliedPosition: "" });
-      fetchCandidates();
-    } catch (err) {
-      console.log("Submit error:", err);
-      alert("Error adding candidate!");
-    }
-  };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const payload = { 
+      ...formData, 
+      age: parseInt(formData.age) || 0, 
+      // Agar experience khali hai toh NaN ke bajaye 0 jaye
+      experience: formData.experience ? parseInt(formData.experience) : 0 
+    };
+
+    console.log("🚀 Sending Payload:", payload); // Debugging ke liye
+    
+    await axios.post(`${API_URL}/api/candidates`, payload);
+    
+    setShowModal(false);
+    setFormData({ name: "", age: "", email: "", phone: "", skills: "", experience: "", appliedPosition: "" });
+    fetchCandidates();
+    alert("Candidate added successfully! 🎉");
+  } catch (err) {
+    console.error("Submit error details:", err.response?.data || err.message);
+    alert(`Error: ${err.response?.data?.error || "Check console for details"}`);
+  }
+};
 
   const deleteCandidate = async (id) => {
     if (window.confirm("Delete this candidate permanently?")) {
