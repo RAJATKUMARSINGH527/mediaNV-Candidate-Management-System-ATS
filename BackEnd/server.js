@@ -74,7 +74,7 @@ app.post('/api/candidates', async (req, res) => {
     console.log(`🎉 New Candidate Onboarded: ${result.rows[0].name}`);
     res.status(201).json(result.rows[0]);
 
-  } catch (err) { // <--- Isse pehle try block band hona chahiye
+  } catch (err) { 
     if (err instanceof z.ZodError) {
       // Zod errors ko handle karne ka sahi tareeka
       const errorMessages = err.issues.map(e => `${e.path}: ${e.message}`).join(', ');
