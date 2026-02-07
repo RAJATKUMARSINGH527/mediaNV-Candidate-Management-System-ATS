@@ -15,17 +15,18 @@ app.use(cors({
 
 app.use(express.json());
 
-// Validation Schema
+// Validation Schema update (experience ko nullable banayein)
 const candidateSchema = z.object({
   name: z.string().min(2),
   age: z.number().min(18),
   email: z.string().email(),
-  phone: z.string().optional(),
+  phone: z.string().optional().or(z.literal('')), // Empty string handle karne ke liye
   skills: z.string().optional(),
-  experience: z.number(),
+  experience: z.number().nullable().default(0), // Null allow karein
   appliedPosition: z.string(),
   status: z.string().default('Applied'),
 });
+
 
 // Middleware to log incoming requests
 app.use((req, res, next) => {
@@ -48,7 +49,8 @@ app.get('/api/candidates', async (req, res) => {
 // 2. CREATE
 app.post('/api/candidates', async (req, res) => {
   console.log("📥 Received Data for Onboarding:", req.body);
-  try {
+  
+  try { // <--- Yeh 'try' hona zaroori hai
     const data = candidateSchema.parse(req.body);
     console.log("✨ Data Validation Passed!");
 
@@ -56,18 +58,32 @@ app.post('/api/candidates', async (req, res) => {
       INSERT INTO candidates (name, age, email, phone, skills, experience, applied_position, status)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`;
     
-    const values = [data.name, data.age, data.email, data.phone, data.skills, data.experience, data.appliedPosition, data.status];
+    // Experience agar null hai toh 0 bhej rahe hain safety ke liye
+    const values = [
+      data.name, 
+      data.age, 
+      data.email, 
+      data.phone || '', 
+      data.skills || '', 
+      data.experience ?? 0, 
+      data.appliedPosition, 
+      data.status
+    ];
     
     const result = await pool.query(query, values);
-    console.log(`🎉 New Candidate Onboarded: ${result.rows[0].name} (ID: ${result.rows[0].id})`);
+    console.log(`🎉 New Candidate Onboarded: ${result.rows[0].name}`);
     res.status(201).json(result.rows[0]);
-  } catch (err) {
+
+  } catch (err) { // <--- Isse pehle try block band hona chahiye
     if (err instanceof z.ZodError) {
-      console.warn("⚠️  Validation Failed:", err.errors.map(e => `${e.path}: ${e.message}`).join(', '));
+      // Zod errors ko handle karne ka sahi tareeka
+      const errorMessages = err.issues.map(e => `${e.path}: ${e.message}`).join(', ');
+      console.warn("⚠️  Validation Failed:", errorMessages);
+      return res.status(400).json({ error: errorMessages });
     } else {
       console.error(`❌ DB_ERROR (POST): ${err.message}`);
+      return res.status(500).json({ error: err.message });
     }
-    res.status(400).json({ error: err.message });
   }
 });
 
