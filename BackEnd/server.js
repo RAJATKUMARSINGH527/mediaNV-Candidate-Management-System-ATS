@@ -1,7 +1,6 @@
-import z  from 'zod';
+import z from 'zod';
 import express from 'express';
 import cors from 'cors';
-import pkg from 'pg';
 import { pool } from './db.js';
 import dotenv from 'dotenv';
 
@@ -28,28 +27,46 @@ const candidateSchema = z.object({
   status: z.string().default('Applied'),
 });
 
+// Middleware to log incoming requests
+app.use((req, res, next) => {
+  console.log(`\n[${new Date().toLocaleTimeString()}] 🛰️  Incoming ${req.method} request to: ${req.url}`);
+  next();
+});
+
 // 1. GET ALL
 app.get('/api/candidates', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM candidates ORDER BY created_at DESC');
+    console.log(`✅ Success: Fetched ${result.rows.length} candidates from database.`);
     res.json(result.rows);
   } catch (err) {
+    console.error(`❌ DB_ERROR (GET): ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });
 
 // 2. CREATE
 app.post('/api/candidates', async (req, res) => {
+  console.log("📥 Received Data for Onboarding:", req.body);
   try {
     const data = candidateSchema.parse(req.body);
+    console.log("✨ Data Validation Passed!");
+
     const query = `
       INSERT INTO candidates (name, age, email, phone, skills, experience, applied_position, status)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`;
+    
     const values = [data.name, data.age, data.email, data.phone, data.skills, data.experience, data.appliedPosition, data.status];
     
     const result = await pool.query(query, values);
+    console.log(`🎉 New Candidate Onboarded: ${result.rows[0].name} (ID: ${result.rows[0].id})`);
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      console.warn("⚠️  Validation Failed:", err.errors.map(e => `${e.path}: ${e.message}`).join(', '));
+    } else {
+      console.error(`❌ DB_ERROR (POST): ${err.message}`);
+    }
     res.status(400).json({ error: err.message });
   }
 });
@@ -57,9 +74,12 @@ app.post('/api/candidates', async (req, res) => {
 // 3. DELETE
 app.delete('/api/candidates/:id', async (req, res) => {
   try {
-    await pool.query('DELETE FROM candidates WHERE id = $1', [req.params.id]);
+    const { id } = req.params;
+    await pool.query('DELETE FROM candidates WHERE id = $1', [id]);
+    console.log(`🗑️  Candidate with ID ${id} has been removed.`);
     res.status(204).send();
   } catch (err) {
+    console.error(`❌ DB_ERROR (DELETE): ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });
@@ -67,26 +87,32 @@ app.delete('/api/candidates/:id', async (req, res) => {
 // 4. UPDATE
 app.put('/api/candidates/:id', async (req, res) => {
   try {
+    const { id } = req.params;
     const { name, status, experience } = req.body;
+    console.log(`🔄 Updating Candidate ID ${id}...`);
+
     const result = await pool.query(
       'UPDATE candidates SET name=$1, status=$2, experience=$3 WHERE id=$4 RETURNING *',
-      [name, status, experience, req.params.id]
+      [name, status, experience, id]
     );
+    
+    console.log(`📝 Update Successful for: ${result.rows[0].name}`);
     res.json(result.rows[0]);
   } catch (err) {
+    console.error(`❌ DB_ERROR (UPDATE): ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });
-
 
 app.get('/', (req, res) => {
   res.json({ message: "Welcome to the Candidate Management System API" });
 });
 
-
 const PORT = process.env.PORT || 7000;
 app.listen(PORT, () => {
-  console.log(`\n================================`);
-  console.log(`🚀 Server Running at Port ${PORT}`);
-  console.log(`================================\n`);
+  console.log(`\n=========================================`);
+  console.log(`🚀  SERVER IS SOARING ON PORT ${PORT}`);
+  console.log(`📂  Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐  API Ready: http://localhost:${PORT}`);
+  console.log(`=========================================\n`);
 });
